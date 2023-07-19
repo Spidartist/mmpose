@@ -1,7 +1,7 @@
 _base_ = ['../../../_base_/default_runtime.py']
 
 # runtime
-train_cfg = dict(max_epochs=60, val_interval=1)
+train_cfg = dict(max_epochs=20, val_interval=1)
 
 # optimizer
 optim_wrapper = dict(optimizer=dict(
@@ -42,55 +42,31 @@ model = dict(
         std=[58.395, 57.12, 57.375],
         bgr_to_rgb=True),
     backbone=dict(
-        type='HRNet',
-        in_channels=3,
-        extra=dict(
-            stage1=dict(
-                num_modules=1,
-                num_branches=1,
-                block='BOTTLENECK',
-                num_blocks=(4, ),
-                num_channels=(64, )),
-            stage2=dict(
-                num_modules=1,
-                num_branches=2,
-                block='BASIC',
-                num_blocks=(4, 4),
-                num_channels=(18, 36)),
-            stage3=dict(
-                num_modules=4,
-                num_branches=3,
-                block='BASIC',
-                num_blocks=(4, 4, 4),
-                num_channels=(18, 36, 72)),
-            stage4=dict(
-                num_modules=3,
-                num_branches=4,
-                block='BASIC',
-                num_blocks=(4, 4, 4, 4),
-                num_channels=(18, 36, 72, 144),
-                multiscale_output=True),
-            upsample=dict(mode='bilinear', align_corners=False)),
-        init_cfg=dict(
-            type='Pretrained', checkpoint='open-mmlab://msra/hrnetv2_w18'),
+        type='mmpretrain.VisionTransformer',
+        arch='base',
+        img_size=(256, 192),
+        patch_size=16,
+        qkv_bias=True,
+        drop_path_rate=0.3,
+        with_cls_token=False,
+        out_type='featmap',
+        patch_cfg=dict(padding=2)
     ),
-    neck=dict(
-        type='FeatureMapProcessor',
-        concat=True,
-    ),
+    neck=dict(type='FeatureMapProcessor', scale_factor=4.0, apply_relu=True),
     head=dict(
         type='HeatmapHead',
-        in_channels=270,
+        in_channels=768,
         out_channels=19,
-        deconv_out_channels=None,
-        conv_out_channels=(270, ),
-        conv_kernel_sizes=(1, ),
+        deconv_out_channels=[],
+        deconv_kernel_sizes=[],
+        final_layer=dict(kernel_size=3, padding=1),
         loss=dict(type='KeypointMSELoss', use_target_weight=True),
-        decoder=codec),
+        decoder=codec,
+    ),
     test_cfg=dict(
         flip_test=True,
         flip_mode='heatmap',
-        shift_heatmap=True,
+        shift_heatmap=False,
     ))
 
 # base dataset settings
@@ -122,7 +98,7 @@ val_pipeline = [
 # data loaders
 train_dataloader = dict(
     batch_size=8,
-    num_workers=2,
+    num_workers=1,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
     dataset=dict(
